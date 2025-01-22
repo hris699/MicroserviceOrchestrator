@@ -1,0 +1,11 @@
+eureka:
+  instance:
+    hostname: localhost
+#    this is so that serviceRegistry itself will not register as client so we set false
+#  also will fetch the registry
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+#  default port no of eureka server
+server:
+  port: 8761

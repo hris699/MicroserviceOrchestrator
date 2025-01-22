@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: dynamic-microservice-orchestrator
+  cloud:
+    feign:
+      client:
+        config:
+          default:
+            loggerLevel: full
+microservice:
+  url: "http://localhost:8081"
