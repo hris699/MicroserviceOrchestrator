@@ -2,7 +2,7 @@ package com.microflow.OrderMicroservice.service.impl;
 
 import com.microflow.OrderMicroservice.dto.OrderRequestDTO;
 import com.microflow.OrderMicroservice.dto.OrderResponseDTO;
-import com.microflow.OrderMicroservice.entity.Order;
+import com.microflow.OrderMicroservice.entity.Orders;
 import com.microflow.OrderMicroservice.repository.OrderRepository;
 import com.microflow.OrderMicroservice.service.OrderService;
 import org.springframework.stereotype.Service;
@@ -15,7 +15,7 @@ public class OrderServiceImpl implements OrderService {
     }
     @Override
     public OrderResponseDTO validateOrder(OrderRequestDTO orderRequestDTO) {
-        Order order = new Order();
+        Orders order = new Orders();
         order.setOrderId(orderRequestDTO.getOrderId());
         order.setProductId(orderRequestDTO.getProductId());
         order.setQuantity(orderRequestDTO.getQuantity());
