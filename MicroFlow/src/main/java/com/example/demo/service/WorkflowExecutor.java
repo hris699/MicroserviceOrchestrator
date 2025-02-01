@@ -1,12 +1,10 @@
 package com.example.demo.service;
 
-
 import com.example.demo.model.WorkflowDefinition;
 import com.example.demo.model.WorkflowStep;
+import com.example.demo.exception.StepExecutionException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -17,55 +15,71 @@ public class WorkflowExecutor {
        this.restTemplate = restTemplate;
    }
    public void executeWorkflow(WorkflowDefinition workflow) {
-       // Map steps by their names for quick lookup
-       Map<String, WorkflowStep> stepMap = workflow.getSteps().stream()
-               .collect(Collectors.toMap(WorkflowStep::getName, step -> step));
-       // Start with the first step
-       Optional<WorkflowStep> currentStepOptional = workflow.getSteps().stream().findFirst();
-       // Loop through the steps until no nextStep is defined
-       while (currentStepOptional.isPresent()) {
-           WorkflowStep currentStep = currentStepOptional.get();
-           // Execute the current step
-           boolean success = executeStep(currentStep);
-           // Determine the next step
-           if (success) {
-               String nextStepName = currentStep.getNextStep();
-               currentStepOptional = Optional.ofNullable(nextStepName).map(stepMap::get);
-           } else {
-               // Handle failure logic (optional)
-               System.out.println("Execution failed for step: " + currentStep.getName());
-               break;
-           }
-       }
-   }
-   private boolean executeStep(WorkflowStep step) {
-       try {
-           // Construct the service endpoint URL
-           String serviceUrl = step.getServiceName() + "/" + step.getAction();
-           if(step.getPathParam()!=null ) {
-        	   serviceUrl = serviceUrl +"/"+ step.getPathParam();
-           }
-           // Execute the HTTP call
-           System.out.println("url "+serviceUrl);
-           Map<String, Object> input = step.getInput();
-           System.out.println("Executing step: " + step.getName() + " with input: " + input);
-           // Using RestTemplate to call the service
-           System.out.println(step.getMethod());
-           if(step.getMethod().equals("GET")) {
-        	   restTemplate.getForObject(serviceUrl, Void.class);
-           }
-           else {
-        	   restTemplate.postForObject(serviceUrl, input, Void.class);
-           }
-           
-           System.out.println("Step executed successfully: " + step.getName());
-           return true;
-       } catch (Exception e) {
-           System.err.println("Error executing step: " + step.getName() + " - " + e.getMessage());
-           if (step.getOnFailure() != null) {
-               System.out.println("Redirecting to onFailure step: " + step.getOnFailure());
-           }
-           return false;
-       }
-   }
+	    Map<String, WorkflowStep> stepMap = workflow.getSteps().stream()
+	            .collect(Collectors.toMap(WorkflowStep::getName, step -> step));
+	    Optional<WorkflowStep> currentStepOptional = workflow.getSteps().stream().findFirst();
+	    while (currentStepOptional.isPresent()) {
+	        WorkflowStep currentStep = currentStepOptional.get();
+	        try {
+	            boolean success = executeStepWithRetry(currentStep);
+	            if (success) {
+	                String nextStepName = currentStep.getNextStep();
+	                currentStepOptional = Optional.ofNullable(nextStepName).map(stepMap::get);
+	            }
+	        } catch (StepExecutionException e) {
+	            throw new StepExecutionException("Execution failed beacuse of: " + e.getMessage());
+	        }
+	    }
+	}
+   private boolean executeStepWithRetry(WorkflowStep step) {
+	    int attempt = 0;
+	    String errorMessage = null;
+	    while (attempt < step.getRetryCount()) {
+	        try {
+	            executeStep(step);
+	            return true;
+	        } catch (Exception e) {
+	            attempt++;
+	            errorMessage = extractErrorMessage(e.getMessage());
+	            System.err.println("Attempt " + attempt + " failed for step: " + step.getName() + ". Retrying in " + step.getRetryDelay() + "ms...");
+	            System.out.println(errorMessage + " getmessage");
+	            try {
+	                Thread.sleep(step.getRetryDelay() * attempt);  // Exponential Backoff
+	            } catch (InterruptedException ie) {
+	                Thread.currentThread().interrupt();
+	                throw new StepExecutionException("Retry interrupted for step: " + step.getName());
+	            }
+	        }
+	    }
+	    System.err.println("All retries failed for step: " + step.getName()+ " - "+ errorMessage);
+	    throw new StepExecutionException(errorMessage != null ? errorMessage : "All retries failed for step: " + step.getName());
+	}
+   private void executeStep(WorkflowStep step) {
+	    try {
+	        String serviceUrl = step.getServiceName() + "/" + step.getAction();
+	        if (step.getPathParam() != null) {
+	            serviceUrl = serviceUrl + "/" + step.getPathParam();
+	        }
+	        System.out.println("Executing step: " + step.getName() + " with input: " + step.getInput());
+	        if (step.getMethod().equalsIgnoreCase("GET")) {
+	            restTemplate.getForObject(serviceUrl, Void.class);
+	        } else {
+	            restTemplate.postForObject(serviceUrl, step.getInput(), Void.class);
+	        }
+	        System.out.println("Step executed successfully: " + step.getName());
+	    } catch (Exception e) {
+	        String errorMessage = extractErrorMessage(e.getMessage());
+	        System.err.println("Error executing step: " + step.getName() + " - " + errorMessage);
+	        throw new StepExecutionException(errorMessage);
+	    }
+	}
+   private String extractErrorMessage(String message) {
+	    // Extract the specific error message
+	    if (message.contains("Insufficient stock")) {
+	        return "Insufficient stock";
+	    } else if (message.contains("Product not found in inventory")) {
+	        return "Product not found in inventory";
+	    }
+	    return message;
+	}
 }

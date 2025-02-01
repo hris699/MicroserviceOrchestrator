@@ -12,9 +12,26 @@ public class WorkflowStep {
    private String onFailure; 
    private String pathParam;
    private String method;
-   // New field added
+   private String failureMessage;
+   private int retryCount = 0;  
+   private long retryDelay = 2000; 
+
 // Getters and setters
-   public String getPathParam() {
+   
+   public int getRetryCount() { 
+	   return retryCount; 
+	   }
+   public void setRetryCount(int retryCount) { 
+	   this.retryCount = retryCount; 
+	   }
+   public long getRetryDelay() {
+	   return retryDelay; 
+	   }
+   public void setRetryDelay(long retryDelay) { 
+	   this.retryDelay = retryDelay;
+	   }
+   
+   public String getPathParam() {	
        return pathParam;
    }
    public void setPathParam(String pathParam) {
@@ -61,6 +78,13 @@ public class WorkflowStep {
    }
    public void setOnFailure(String onFailure) {
        this.onFailure = onFailure;
+   }
+   public String getFailureMessage() {
+       return failureMessage;
+   }
+
+   public void setFailureMessage(String failureMessage) {
+       this.failureMessage = failureMessage;
    }
 public String getUrl() {
 	// TODO Auto-generated method stub

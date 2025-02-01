@@ -1,0 +1,68 @@
+workflowName: OrderProcessingWorkflow
+services:
+ - serviceName: OrderService
+   url: http://localhost:8081/api/orders
+   supportedActions:
+     - validate
+ - serviceName: InventoryService
+   url: http://localhost:8082/api/inventory
+   supportedActions:
+     - check
+     - reduce
+     - add
+ - serviceName: PaymentService
+   url: http://localhost:8083/api/payments
+   supportedActions:
+     - process
+steps:
+ - name: ValidateOrder
+   serviceName: http://localhost:8081/api/orders
+   action: validate
+   method: POST
+   input:
+     orderId: 12345
+     productId: P001
+     quantity: 2
+   nextStep: CheckInventory
+   retryCount: 4  
+   retryDelay: 1000  
+ - name: CheckInventory
+   serviceName: http://localhost:8082/api/inventory
+   action: check
+   method: GET
+   pathParam: P001
+   input:
+     productId: P001
+   nextStep: ReduceInventory
+   onFailure: HandleOutOfStock  
+   retryCount: 5  
+   retryDelay: 1000 
+ - name: ReduceInventory
+   serviceName: http://localhost:8082/api/inventory
+   action: reduce
+   method: POST
+   input:
+     productId: P001
+     quantity: 2
+   nextStep: ProcessPayment
+   retryCount: 4  
+   retryDelay: 1000
+ - name: ProcessPayment
+   serviceName: http://localhost:8083/api/payments
+   action: process
+   method: POST
+   input:
+     orderId: 12345
+     amount: 100.00
+     paymentMethod: CreditCard
+   nextStep: null
+   retryCount: 5
+   retryDelay: 1000
+ - name: HandleOutOfStock
+   serviceName: http://localhost:8082/api/inventory
+   action: add
+   method: POST
+   input:
+     productId: P001
+     quantity: 5
+   nextStep: CheckInventory  
